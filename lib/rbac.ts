@@ -1,5 +1,5 @@
 import { Role, UserStatus } from '@prisma/client'
-import { RolePermissions } from '@/types/auth'
+import { rolePermissions } from '../types/auth'
 
 type Permission = string // Define a more specific type if needed
 
@@ -61,8 +61,8 @@ export function hasPermission(user: UserWithRole, permission: string): boolean {
   if (user.status !== UserStatus.ACTIVE) return false
   
   // Get permissions for the user's role
-  const rolePermissions = RolePermissions[user.role] || []
-  return rolePermissions.includes(permission)
+  const userPermissions = rolePermissions[user.role]?.permissions || []
+  return userPermissions.includes(permission) || userPermissions.includes('*')
 }
 
 /**

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { auth } from '@/lib/auth-config'
+import { getServerSession } from 'next-auth/next'
+import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 type ProjectStatus = 'DRAFT' | 'PLANNING' | 'IN_PROGRESS' | 'ON_HOLD' | 'COMPLETED' | 'CANCELLED' | 'ARCHIVED'
@@ -59,7 +60,7 @@ interface ProjectCreateData {
 export async function GET(request: Request) {
   try {
     // Verify admin access
-    const session = await auth.api.getSession({ req: request } as any)
+    const session = await getServerSession(authOptions)
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -134,7 +135,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     // Verify admin access
-    const session = await auth.api.getSession({ req: request } as any)
+    const session = await getServerSession(authOptions)
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }

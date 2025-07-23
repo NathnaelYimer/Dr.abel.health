@@ -1,8 +1,9 @@
-import { auth, type Session } from '@/lib/auth-config'
-import { Role } from '@prisma/client'
+import { getServerSession } from 'next-auth/next'
+import { authOptions } from './auth'
+import { Role, User as PrismaUser } from '@prisma/client'
 
 // Define the shape of the user in the session
-type SessionUser = {
+export type SessionUser = {
   id: string
   email: string
   name: string | null
@@ -16,16 +17,13 @@ type SessionUser = {
 
 export async function getSession() {
   try {
-    const session = await auth.api.getSession({
-      headers: new Headers(),
-      query: { disableCookieCache: true }
-    })
+    const session = await getServerSession(authOptions)
     
     if (!session?.user) return null
     
     return {
       user: session.user as unknown as SessionUser,
-      expires: session.session?.expiresAt || new Date(Date.now() + 1000 * 60 * 60 * 24 * 7) // Default to 1 week if not available
+      expires: session.expires || new Date(Date.now() + 1000 * 60 * 60 * 24 * 7) // Default to 1 week if not available
     }
   } catch (error) {
     console.error('Error getting session:', error)
@@ -33,7 +31,8 @@ export async function getSession() {
   }
 }
 
-export type { Session }
+// Re-export the Session type from next-auth
+export type { Session } from 'next-auth'
 
 export async function getCurrentUser() {
   const session = await getSession()
