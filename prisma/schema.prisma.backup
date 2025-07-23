@@ -1,0 +1,545 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  SUPER_ADMIN  @map("super_admin")
+  ADMIN        @map("admin")
+  EDITOR       @map("editor")
+  AUTHOR       @map("author")
+  CONTRIBUTOR  @map("contributor")
+  VIEWER       @map("viewer")
+  
+  @@map("roles")
+}
+
+enum UserStatus {
+  ACTIVE      @map("active")
+  INACTIVE    @map("inactive")
+  PENDING     @map("pending")
+  SUSPENDED   @map("suspended")
+  
+  @@map("user_statuses")
+}
+        
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  role          Role        @default(VIEWER)
+  status        UserStatus  @default(PENDING)
+  lastActive    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  bio           String?   @db.Text
+  location      String?
+  website       String?
+  twitter       String?
+  linkedin      String?
+  github        String?
+  
+  // Authentication
+  accounts Account[]
+  sessions Session[]
+  
+  // Content
+  posts    Post[]
+  comments Comment[]
+  
+  // Activity
+  auditLogs AuditLog[]
+  activities ActivityLog[]
+  engagement  UserEngagement? @relation(fields: [engagementId], references: [id])
+  engagementId String? @unique
+  
+  // Project Relations
+  createdProjects Project[] @relation("CreatedProjects")
+  updatedProjects Project[] @relation("UpdatedProjects")
+  
+  // Project Updates
+  projectUpdates ProjectUpdate[]
+
+  @@map("users")
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   // 'comment' | 'post' | 'user' | 'project' | 'publication'
+  action    String   // e.g., 'created', 'updated', 'deleted', 'approved', 'rejected'
+  title     String   // Short title of the activity
+  metadata  Json?    // Additional data related to the activity
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([type])
+  @@index([createdAt])
+  @@map("activity_logs")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verificationtokens")
+}
+
+model Post {
+  id          String      @id @default(cuid())
+  title       String
+  slug        String      @unique
+  content     String      @db.Text
+  excerpt     String?
+  published   Boolean     @default(false)
+  archived    Boolean     @default(false)
+  language    Language    @default(EN)
+  category    Category
+  tags        String[]
+  authorId    String
+  featuredImage String?
+  readTime    Int?        // in minutes
+  citations   Citation[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  publishedAt DateTime?
+
+  author    User      @relation(fields: [authorId], references: [id])
+  comments  Comment[]
+  versions  PostVersion[]
+
+  @@map("posts")
+}
+
+model PostVersion {
+  id        String   @id @default(cuid())
+  postId    String
+  title     String
+  content   String   @db.Text
+  version   Int
+  createdAt DateTime @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@map("post_versions")
+  @@unique([postId, version])
+}
+
+model Citation {
+  id       String @id @default(cuid())
+  postId   String
+  title    String
+  authors  String
+  journal  String?
+  year     Int?
+  doi      String?
+  url      String?
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@map("citations")
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String   @db.Text
+  postId    String
+  authorId  String
+  approved  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author User @relation(fields: [authorId], references: [id])
+
+  @@map("comments")
+}
+
+model Contact {
+  id          String      @id @default(cuid())
+  name        String
+  email       String
+  phone       String?
+  subject     String
+  message     String      @db.Text
+  serviceType ServiceType?
+  status      ContactStatus @default(PENDING)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@map("contacts")
+}
+
+model Newsletter {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  subscribed  Boolean  @default(true)
+  language    Language @default(EN)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("newsletters")
+}
+
+model Appointment {
+  id          String            @id @default(cuid())
+  name        String
+  email       String
+  phone       String?
+  serviceType ServiceType
+  preferredDate DateTime
+  message     String?           @db.Text
+  status      AppointmentStatus @default(PENDING)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@map("appointments")
+}
+
+model Testimonial {
+  id        String   @id @default(cuid())
+  name      String
+  title     String?
+  content   String   @db.Text
+  rating    Int      @default(5)
+  approved  Boolean  @default(false)
+  featured  Boolean  @default(false)
+  image     String?
+  createdAt DateTime @default(now())
+
+  @@map("testimonials")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String
+  resource  String
+  details   Json?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}
+
+model SiteSettings {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String @db.Text
+
+  @@map("site_settings")
+}
+
+
+enum Language {
+  EN
+  AM
+  OR
+  TI
+}
+
+enum Category {
+  MATERNAL_HEALTH
+  INFECTIOUS_DISEASES
+  NON_COMMUNICABLE_DISEASES
+  CLINICAL_TRIALS
+  HEALTH_POLICY
+  NUTRITION
+  RESEARCH
+  CAPACITY_BUILDING
+  DIGITAL_HEALTH
+}
+
+enum ServiceType {
+  CONSULTATION
+  RESEARCH
+  CLINICAL_TRIALS
+  CAPACITY_BUILDING
+  POLICY
+  REGULATORY
+  OTHER
+}
+
+enum ContactStatus {
+  PENDING
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+model Project {
+  id              String      @id @default(cuid())
+  title           String
+  slug            String      @unique
+  description     String      @db.Text
+  content         String      @db.Text
+  status          ProjectStatus @default(DRAFT)
+  type            ProjectType
+  progress        Int         @default(0) // 0-100 percentage
+  priority        Priority    @default(MEDIUM)
+  startDate       DateTime
+  endDate         DateTime?
+  budget          Float?
+  client          String?
+  location        String?
+  impact          String?     @db.Text
+  beneficiaries   String?     // e.g., "15,000+ pregnant women"
+  fundingSource   String?
+  objectives      String[]
+  outcomes        String[]
+  milestones      Json?       // Array of { title: String, dueDate: DateTime, completed: Boolean, description?: String }
+  tasks           Json?       // Array of { id: String, title: String, completed: Boolean, assignedTo?: String, dueDate?: DateTime }
+  partners        String[]    // Array of partner organization names
+  coverImage      String?
+  gallery         String[]    // Array of image URLs
+  documents       String[]    // Array of document URLs
+  featured        Boolean     @default(false)
+  published       Boolean     @default(false)
+  tags            String[]
+  teamMembers     TeamMember[]
+  updates         ProjectUpdate[]
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  createdBy       User        @relation("CreatedProjects", fields: [createdById], references: [id])
+  createdById     String
+  updatedBy       User?       @relation("UpdatedProjects", fields: [updatedById], references: [id])
+  updatedById     String?
+  
+  @@index([status])
+  @@index([type])
+  @@index([priority])
+  @@index([startDate])
+  @@index([endDate])
+  
+  @@map("projects")
+}
+
+model TeamMember {
+  id        String   @id @default(cuid())
+  name      String
+  role      String
+  bio       String?  @db.Text
+  image     String?
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId String
+  
+  @@map("team_members")
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum ProjectStatus {
+  DRAFT
+  PLANNING
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+  ARCHIVED
+}
+
+enum ProjectType {
+  MATERNAL_CHILD_HEALTH
+  COMMUNICABLE_DISEASE
+  NON_COMMUNICABLE_DISEASE
+  NUTRITION
+  MENTAL_HEALTH
+  CLIMATE_CHANGE
+  CAPACITY_BUILDING
+  RESEARCH
+  POLICY
+  OTHER
+}
+
+model ProjectUpdate {
+  id          String   @id @default(cuid())
+  title       String
+  description String   @db.Text
+  progress    Int      // 0-100 percentage
+  status      ProjectStatus
+  challenges  String?  @db.Text
+  nextSteps   String?  @db.Text
+  attachments String[] // Array of file URLs
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId   String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("project_updates")
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String   // e.g., 'comment', 'post', 'user', 'project', 'publication', 'settings'
+  action    String   // e.g., 'created', 'updated', 'deleted', 'approved', 'rejected', 'published', 'logged_in', 'logged_out', 'registered'
+  title     String
+  metadata  Json?    @default("{}")
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([type])
+  @@index([action])
+  @@index([createdAt])
+  @@map("activity_logs")
+}
+
+// User Engagement Models
+model UserEngagement {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  likes       Like[]
+  bookmarks   Bookmark[]
+  searchHistory SearchHistory[]
+  notifications Notification[]
+  
+  @@map("user_engagements")
+}
+
+model Like {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  postId      String?
+  post        Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  commentId   String?
+  comment     Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  projectId   String?
+  project     Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  
+  @@unique([userId, postId, commentId, projectId])
+  @@index([postId])
+  @@index([commentId])
+  @@index([projectId])
+  @@index([createdAt])
+  @@map("likes")
+}
+
+model Bookmark {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  postId      String?
+  post        Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  projectId   String?
+  project     Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  folder      String?   // Optional folder/category for bookmarks
+  notes       String?   @db.Text
+  createdAt   DateTime @default(now())
+  
+  @@index([userId])
+  @@index([postId])
+  @@index([projectId])
+  @@index([createdAt])
+  @@map("bookmarks")
+}
+
+model SearchHistory {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  query       String
+  filters     Json?    // Store search filters as JSON
+  resultCount Int
+  clickedResultId String?
+  clickedResultType String? // 'post', 'project', 'publication', etc.
+  createdAt   DateTime @default(now())
+  
+  @@index([userId])
+  @@index([query])
+  @@index([createdAt])
+  @@map("search_history")
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        String   // 'like', 'comment', 'reply', 'mention', 'system', 'update'
+  title       String
+  message     String   @db.Text
+  isRead      Boolean  @default(false)
+  link        String?  // URL to the relevant content
+  relatedId   String?  // ID of the related content
+  relatedType String?  // Type of related content
+  createdAt   DateTime @default(now())
+  readAt      DateTime?
+  
+  @@index([userId])
+  @@index([type])
+  @@index([isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+// Add relationships to User model
+model User {
+  // ... existing fields ...
+  engagement  UserEngagement? @relation(fields: [engagementId], references: [id])
+  engagementId String? @unique
+  // ... rest of the model ...
+}
