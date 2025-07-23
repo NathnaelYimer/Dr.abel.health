@@ -1,15 +1,13 @@
-import { auth } from "@/lib/auth-config"
+import { getServerSession } from "next-auth/next"
+import { authOptions } from "@/lib/auth-options"
 import { prisma } from "@/lib/prisma"
 import { redirect } from "next/navigation"
-import { headers } from "next/headers"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { FileText, Users, MessageSquare, Calendar, TrendingUp, Eye } from "lucide-react"
 
 export default async function AdminDashboard() {
-  // Get session from Better Auth server-side
-  const session = await auth.api.getSession({
-    headers: headers()
-  })
+  // Get session using NextAuth
+  const session = await getServerSession(authOptions)
   
   // Check if user is authenticated and is admin
   if (!session?.user) {

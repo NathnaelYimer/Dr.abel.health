@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { useSession } from "@/lib/auth-client"
-import type { Session } from "@/lib/auth-config"
+import { useSession } from "next-auth/react"
+import type { Session } from "next-auth"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -28,19 +28,25 @@ import {
   Star
 } from "lucide-react"
 
+// Extend the default session type to include our custom fields
+type ExtendedSession = Session & {
+  user?: {
+    id: string;
+    name?: string | null;
+    email?: string | null;
+    image?: string | null;
+    role?: string;
+    bio?: string | null;
+    createdAt?: Date | string | null;
+  };
+};
+
 export default function ProfilePage() {
-  const { data: session, isPending } = useSession() as { 
-    data: (Session & { 
-      user: { 
-        role: string; 
-        bio?: string;
-        email?: string;
-        name?: string;
-        image?: string | null;
-      } 
-    }) | null; 
-    isPending: boolean 
-  }
+  const { data: session, status } = useSession() as { data: ExtendedSession | null; status: string };
+  const user = session?.user;
+  const { name, email, image, bio, role } = user || {};
+  const createdAt = user?.createdAt ? new Date(user.createdAt) : new Date();
+  const isPending = status === 'loading';
   const router = useRouter()
 
   // Check authentication

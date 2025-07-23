@@ -171,11 +171,21 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions)
+    // Get session using NextAuth
+    const session = await getServerSession(authOptions);
     
-    // Check if user is admin
-    if (!session?.user || !['admin@drabel.com', 'abel@drabel.com', 'admin@example.com'].includes(session.user.email || '')) {
-      return new NextResponse('Unauthorized', { status: 401 })
+    // Check if user is authenticated and has admin role
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Check if user is admin or has the required role
+    const isAdmin = session.user.role === 'ADMIN' || 
+      ['admin@drabel.com', 'abel@drabel.com', 'admin@example.com']
+        .includes(session.user.email || '');
+    
+    if (!isAdmin) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     // First, delete all replies to this comment using raw SQL

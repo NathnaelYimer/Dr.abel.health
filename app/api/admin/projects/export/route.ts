@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { auth } from '@/lib/auth-config'
+import { getServerSession } from 'next-auth/next'
+import { authOptions } from '@/lib/auth-options'
 import { prisma } from '@/lib/prisma'
 import { createWriteStream } from 'fs'
 import { join } from 'path'
@@ -8,14 +9,15 @@ import { format } from 'date-fns'
 
 export async function GET(request: Request) {
   try {
-    // Verify admin access
-    const session = await auth.api.getSession({ req: request } as any)
+    // Get session using NextAuth
+    const session = await getServerSession(authOptions)
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const isAdmin = session.user.role === "ADMIN" || 
-      ["admin@drabel.com", "abel@drabel.com", "admin@example.com"].includes(session.user.email || "")
+    // Check if user is admin
+    const isAdmin = session.user.role === 'ADMIN' || 
+      ['admin@drabel.com', 'abel@drabel.com', 'admin@example.com'].includes(session.user.email || '')
     
     if (!isAdmin) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
