@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge"
 import { format } from "date-fns"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import { useState } from "react"
 
 export type Comment = {
   id: string
@@ -87,11 +88,15 @@ export const columns: ColumnDef<Comment>[] = [
   },
   {
     id: "actions",
-    cell: ({ row }) => {
+    cell: function Cell({ row }) {
       const comment = row.original
       const router = useRouter()
+      const [isUpdating, setIsUpdating] = useState(false)
 
       const handleStatusUpdate = async (approved: boolean) => {
+        if (isUpdating) return;
+        
+        setIsUpdating(true);
         try {
           const response = await fetch(`/api/admin/comments/${comment.id}`, {
             method: 'PATCH',
@@ -110,6 +115,8 @@ export const columns: ColumnDef<Comment>[] = [
         } catch (error) {
           console.error('Error updating comment approval status:', error)
           toast.error('Failed to update comment approval status')
+        } finally {
+          setIsUpdating(false);
         }
       }
 

@@ -1,5 +1,5 @@
 import { Role, UserStatus } from '@prisma/client'
-import { rolePermissions } from '../types/auth'
+import { rolePermissions } from '@/types/auth'
 
 type Permission = string // Define a more specific type if needed
 
@@ -143,9 +143,9 @@ export function getUserPermissions(user: UserWithRole): Set<Permission> {
   }
   
   // Add permissions based on role
-  // This comes from the RolePermissions defined in auth.d.ts
-  const rolePermissions = RolePermissions[user.role] || []
-  return new Set<string>(rolePermissions)
+  // This comes from the rolePermissions defined in types/auth.ts
+  const userRolePermissions = rolePermissions[user.role]?.permissions || []
+  return new Set<string>(userRolePermissions)
 }
 
 /**

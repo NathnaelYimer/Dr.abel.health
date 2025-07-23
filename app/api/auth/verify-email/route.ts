@@ -43,7 +43,8 @@ export async function POST(request: NextRequest) {
       await prisma.user.update({
         where: { email: tokenData.email },
         data: { 
-          emailVerified: new Date(),
+          emailVerified: true,
+          status: 'ACTIVE', // Update status to active when email is verified
           // You might also want to update other fields
         }
       })
