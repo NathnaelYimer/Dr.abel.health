@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { useSession } from "@/lib/auth-client"
+import { useSession } from "next-auth/react"
 import { Role } from "@prisma/client"
 
 // Use type assertion to handle the session user type
@@ -39,7 +39,7 @@ import {
 } from "lucide-react"
 
 export default function SettingsPage() {
-  const { data: session, isPending } = useSession()
+  const { data: session, status } = useSession()
   const router = useRouter()
   const { toast } = useToast()
   
@@ -65,10 +65,10 @@ export default function SettingsPage() {
 
   // Check authentication
   useEffect(() => {
-    if (!isPending && !session?.user) {
+    if (status !== "loading" && !session?.user) {
       router.push('/auth/signin?callbackUrl=/settings')
     }
-  }, [session, isPending, router])
+  }, [session, status, router])
 
   const user = session?.user as SessionUser | undefined
   
@@ -166,7 +166,7 @@ export default function SettingsPage() {
     }
   }
 
-  if (isPending) {
+  if (status === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
