@@ -1,63 +1,87 @@
-import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
+import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
 
-export async function GET(req: Request) {
+export const dynamic = 'force-dynamic'
+
+export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    const query = searchParams.get('q') || '';
-    const limit = parseInt(searchParams.get('limit') || '5', 10);
+    const { searchParams } = new URL(request.url)
+    const query = searchParams.get('q') || ''
+    const limit = parseInt(searchParams.get('limit') || '10')
 
-    if (!query || query.length < 2) {
-      return NextResponse.json({ suggestions: [] });
+    if (!query.trim() || query.length < 2) {
+      return NextResponse.json({ suggestions: [] })
     }
 
-    const searchQuery = `%${query}%`;
+    const searchTerm = query.trim()
 
-    // Search in posts
-    const postResults = await prisma.$queryRaw`
-      SELECT title as text, 'post' as type
-      FROM "Post"
-      WHERE title ILIKE ${searchQuery} AND published = true
-      LIMIT ${limit}
-    `;
+    // Get search suggestions from posts, projects, and tags
+    const [postSuggestions, projectSuggestions, tagSuggestions] = await Promise.all([
+      // Post titles
+      prisma.post.findMany({
+        where: {
+          published: true,
+          title: { contains: searchTerm, mode: 'insensitive' }
+        },
+        select: { title: true, slug: true },
+        take: 5
+      }),
+      
+      // Project titles
+      prisma.project.findMany({
+        where: {
+          published: true,
+          title: { contains: searchTerm, mode: 'insensitive' }
+        },
+        select: { title: true, slug: true },
+        take: 5
+      }),
+      
+      // Tags
+      prisma.tag.findMany({
+        where: {
+          name: { contains: searchTerm, mode: 'insensitive' }
+        },
+        select: { name: true, slug: true },
+        take: 5
+      })
+    ])
 
-    // Search in projects
-    const projectResults = await prisma.$queryRaw`
-      SELECT title as text, 'project' as type
-      FROM "Project"
-      WHERE title ILIKE ${searchQuery} AND status = 'ACTIVE'
-      LIMIT ${limit}
-    `;
+    // Combine and format suggestions
+    const suggestions = [
+      ...postSuggestions.map(item => ({
+        text: item.title,
+        type: 'post',
+        slug: item.slug
+      })),
+      ...projectSuggestions.map(item => ({
+        text: item.title,
+        type: 'project',
+        slug: item.slug
+      })),
+      ...tagSuggestions.map(item => ({
+        text: item.name,
+        type: 'tag',
+        slug: item.slug
+      }))
+    ]
 
-    // Search in publications
-    const publicationResults = await prisma.$queryRaw`
-      SELECT title as text, 'publication' as type
-      FROM "Publication"
-      WHERE title ILIKE ${searchQuery}
-      LIMIT ${limit}
-    `;
+    // Remove duplicates and limit results
+    const uniqueSuggestions = suggestions
+      .filter((item, index, self) => 
+        index === self.findIndex(t => t.text === item.text)
+      )
+      .slice(0, limit)
 
-    // Combine and deduplicate results
-    const allResults = [
-      ...(postResults as Array<{ text: string; type: string }>),
-      ...(projectResults as Array<{ text: string; type: string }>),
-      ...(publicationResults as Array<{ text: string; type: string }>),
-    ];
-
-    // Deduplicate and limit results
-    const uniqueResults = Array.from(
-      new Map(allResults.map((item) => [item.text, item])).values()
-    ).slice(0, limit);
-
-    // Extract just the text for suggestions
-    const suggestions = uniqueResults.map((item) => item.text);
-
-    return NextResponse.json({ suggestions });
+    return NextResponse.json({
+      suggestions: uniqueSuggestions,
+      query: searchTerm
+    })
   } catch (error) {
-    console.error('Error fetching search suggestions:', error);
+    console.error('Search suggestions error:', error)
     return NextResponse.json(
-      { error: 'Failed to fetch search suggestions' },
+      { error: 'Failed to get suggestions', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
-    );
+    )
   }
 }

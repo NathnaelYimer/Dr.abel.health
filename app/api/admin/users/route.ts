@@ -1,84 +1,93 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
-import { authOptions } from '@/lib/auth'
+import { authOptions } from '@/lib/auth-options'
 import { prisma } from '@/lib/prisma'
+
+export const dynamic = 'force-dynamic'
 
 export async function GET(request: Request) {
   try {
-    // Verify admin access
     const session = await getServerSession(authOptions)
+    
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     // Check if user is admin
-    const isAdmin = session.user.role === "ADMIN" || 
-      ["admin@drabel.com", "abel@drabel.com", "admin@example.com"].includes(session.user.email || "")
+    const isAdmin = session.user.role === 'ADMIN' || 
+      ['admin@drabel.com', 'abel@drabel.com', 'admin@example.com'].includes(session.user.email || '')
     
     if (!isAdmin) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const { searchParams } = new URL(request.url)
-    const statusFilter = searchParams.get('status')
-    const roleFilter = searchParams.get('role')
-    const searchQuery = searchParams.get('q') || ''
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '10')
+    const search = searchParams.get('search') || ''
+    const role = searchParams.get('role') || ''
+    const status = searchParams.get('status') || ''
+    const sortBy = searchParams.get('sortBy') || 'createdAt'
+    const sortOrder = searchParams.get('sortOrder') || 'desc'
 
-    // Build the where clause
+    const skip = (page - 1) * limit
+
+    // Build where clause
     const where: any = {}
     
-    if (statusFilter) where.status = statusFilter
-    if (roleFilter) where.role = roleFilter
-    if (searchQuery) {
+    if (search) {
       where.OR = [
-        { name: { contains: searchQuery, mode: 'insensitive' } },
-        { email: { contains: searchQuery, mode: 'insensitive' } },
+        { name: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } }
       ]
     }
+    
+    if (role) where.role = role
+    if (status) where.status = status
 
-    // Fetch users with related data
-    const users = await prisma.user.findMany({
-      where,
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        emailVerified: true,
-        image: true,
-        role: true,
-        status: true,
-        lastActive: true,
-        createdAt: true,
-        updatedAt: true,
-        _count: {
-          select: {
-            posts: true,
-            comments: true,
-          },
+    // Get users with pagination
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          status: true,
+          emailVerified: true,
+          lastActive: true,
+          createdAt: true,
+          updatedAt: true,
+          _count: {
+            select: {
+              posts: true,
+              comments: true,
+              likes: true,
+              bookmarks: true
+            }
+          }
         },
-      },
-      orderBy: { createdAt: 'desc' },
+        orderBy: { [sortBy]: sortOrder },
+        skip,
+        take: limit
+      }),
+      prisma.user.count({ where })
+    ])
+
+    return NextResponse.json({
+      users,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit)
+      }
     })
-
-    // Format the response
-    const formattedUsers = users.map(user => ({
-      id: user.id,
-      name: user.name || 'No Name',
-      email: user.email || 'No Email',
-      role: user.role,
-      status: user.status || (user.emailVerified ? 'ACTIVE' : 'PENDING'),
-      emailVerified: !!user.emailVerified,
-      lastActive: user.lastActive || user.updatedAt,
-      joined: user.createdAt,
-      posts: user._count.posts,
-      comments: user._count.comments,
-    }))
-
-    return NextResponse.json(formattedUsers)
   } catch (error) {
     console.error('Error fetching users:', error)
     return NextResponse.json(
-      { error: 'Failed to fetch users' },
+      { error: 'Failed to fetch users', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     )
   }

@@ -7,6 +7,8 @@ import { join } from 'path'
 import { createObjectCsvStringifier } from 'csv-writer'
 import { format } from 'date-fns'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: Request) {
   try {
     // Get session using NextAuth
