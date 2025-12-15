@@ -12,6 +12,11 @@ import { formatDistanceToNow } from 'date-fns'
 interface CommentSectionProps {
   postId: string
   initialComments?: Comment[]
+
+
+
+
+  
 }
 
 export function CommentSection({ postId, initialComments = [] }: CommentSectionProps) {
