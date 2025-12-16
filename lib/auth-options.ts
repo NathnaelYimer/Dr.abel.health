@@ -17,7 +17,22 @@ import { PrismaAdapter } from "@next-auth/prisma-adapter"
 import { prisma } from "./db"
 import { compare } from "bcryptjs"
 import { Adapter, AdapterUser } from "next-auth/adapters"
-import { Role, User as PrismaUser } from "@prisma/client"
+// Avoid importing generated Prisma types directly here (can cause type resolution
+// issues in some environments). Use local, narrow types for auth flows.
+type Role = string
+
+type PrismaUser = {
+  id: string
+  email?: string | null
+  name?: string | null
+  image?: string | null
+  role?: Role
+  bio?: string | null
+  status?: UserStatus
+  lastActive?: Date | null
+  emailVerified?: Date | null
+  password?: string
+}
 
 type UserStatus = string
 
@@ -29,7 +44,7 @@ declare module "next-auth/jwt" {
     name?: string | null
     email?: string | null
     image?: string | null
-    role: Role
+    role: string
     bio?: string | null
     status: UserStatus
     lastActive?: Date | null
@@ -38,8 +53,17 @@ declare module "next-auth/jwt" {
 }
 
 // Type for user with password (only used during authentication)
-type UserWithPassword = Omit<PrismaUser, 'password'> & {
+type UserWithPassword = {
+  id: string
+  email: string
+  name?: string | null
   password: string
+  role: string
+  bio?: string | null
+  status: UserStatus
+  lastActive?: Date | null
+  emailVerified?: Date | null
+  image?: string | null
 }
 
 export const authOptions: NextAuthOptions = {
