@@ -3,9 +3,13 @@ import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth-options"
 import OpenAI from "openai"
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+function getOpenAIClient() {
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) {
+    throw new Error('Missing OPENAI_API_KEY')
+  }
+  return new OpenAI({ apiKey })
+}
 
 export async function POST(request: Request) {
   try {
@@ -35,17 +39,24 @@ Title: ${title}
 Content: ${content.slice(0, 4000)}...`
 
     // Call OpenAI API for analysis
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4",
-      messages: [
-        {
-          role: "system",
-          content: "You are a helpful assistant that analyzes blog content and provides structured metadata.",
-        },
-        { role: "user", content: prompt },
-      ],
-      temperature: 0.7,
-    })
+    let completion
+    try {
+      const openai = getOpenAIClient()
+      completion = await openai.chat.completions.create({
+        model: "gpt-4",
+        messages: [
+          {
+            role: "system",
+            content: "You are a helpful assistant that analyzes blog content and provides structured metadata.",
+          },
+          { role: "user", content: prompt },
+        ],
+        temperature: 0.7,
+      })
+    } catch (e) {
+      console.error('OpenAI error:', e)
+      return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 })
+    }
 
     const analysis = completion.choices[0]?.message?.content || ""
 
