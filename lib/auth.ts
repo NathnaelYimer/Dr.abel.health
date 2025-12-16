@@ -6,30 +6,43 @@ import { customPrismaAdapter } from "./custom-prisma-adapter"
 
 export const authOptions: NextAuthOptions = {
   adapter: customPrismaAdapter(prisma),
-  providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-      authorization: {
-        params: {
-          prompt: "consent",
-          access_type: "offline",
-          response_type: "code"
-        }
-      }
-    }),
-    EmailProvider({
-      server: {
-        host: process.env.EMAIL_SERVER_HOST || '',
-        port: parseInt(process.env.EMAIL_SERVER_PORT || '587', 10),
-        auth: {
-          user: process.env.EMAIL_SERVER_USER || '',
-          pass: process.env.EMAIL_SERVER_PASSWORD || '',
+  providers: (() => {
+    const providers: any[] = []
+
+    // Only add Google provider when credentials are configured
+    if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+      providers.push(
+        GoogleProvider({
+          clientId: process.env.GOOGLE_CLIENT_ID,
+          clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+          authorization: {
+            params: {
+              prompt: "consent",
+              access_type: "offline",
+              response_type: "code"
+            }
+          }
+        })
+      )
+    }
+
+    // Email provider is safe to add; default to empty values if missing
+    providers.push(
+      EmailProvider({
+        server: {
+          host: process.env.EMAIL_SERVER_HOST || '',
+          port: parseInt(process.env.EMAIL_SERVER_PORT || '587', 10),
+          auth: {
+            user: process.env.EMAIL_SERVER_USER || '',
+            pass: process.env.EMAIL_SERVER_PASSWORD || '',
+          },
         },
-      },
-      from: process.env.EMAIL_FROM || 'noreply@drabelhealthconsulting.org',
-    }),
-  ],
+        from: process.env.EMAIL_FROM || 'noreply@drabelhealthconsulting.org',
+      })
+    )
+
+    return providers
+  })(),
   callbacks: {
     session: async ({ session, token }) => {
       if (session?.user && token?.sub) {
