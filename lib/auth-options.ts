@@ -13,11 +13,13 @@ type NextAuthUser = {
 }
 import type { JWT as JWTType } from "next-auth/jwt"
 import CredentialsProvider from "next-auth/providers/credentials"
-import { PrismaAdapter } from "@auth/prisma-adapter"
+import { PrismaAdapter } from "@next-auth/prisma-adapter"
 import { prisma } from "./db"
 import { compare } from "bcryptjs"
 import { Adapter, AdapterUser } from "next-auth/adapters"
-import { Role, UserStatus, User as PrismaUser } from "@prisma/client"
+import { Role, User as PrismaUser } from "@prisma/client"
+
+type UserStatus = string
 
 // Types are now defined in types/next-auth.d.ts
 
