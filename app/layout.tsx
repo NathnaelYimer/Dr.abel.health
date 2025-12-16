@@ -49,17 +49,23 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode
 }) {
-  const session = await getServerSession(authOptions)
-  return (
-    <html lang="en">
-      <body className={inter.className}>
-        <Providers session={session}>
-          <Header />
-          <main className="min-h-[calc(100vh-160px)]">{children}</main>
-          <Footer />
-          <Toaster />
-        </Providers>
-      </body>
-    </html>
-  )
+  try {
+    const session = await getServerSession(authOptions)
+    return (
+      <html lang="en">
+        <body className={inter.className}>
+          <Providers session={session}>
+            <Header />
+            <main className="min-h-[calc(100vh-160px)]">{children}</main>
+            <Footer />
+            <Toaster />
+          </Providers>
+        </body>
+      </html>
+    )
+  } catch (err) {
+    console.error('Top-level SSR error in RootLayout:', err)
+    // Re-throw so Vercel logs the 500 and we still surface the error
+    throw err
+  }
 }
